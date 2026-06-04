@@ -1,0 +1,30 @@
+{
+  "name": "mercari-proxy",
+  "version": "0.1.0",
+  "description": "A zero-dependency reverse proxy for Mercari (jp/us). Runs on Node 18+ or Cloudflare Workers.",
+  "keywords": [
+    "mercari",
+    "proxy",
+    "reverse-proxy",
+    "cloudflare-workers",
+    "node"
+  ],
+  "license": "MIT",
+  "author": "gosoki",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gosoki/mercari-proxy.git"
+  },
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "start:us": "UPSTREAM=www.mercari.com node server.js",
+    "start:https": "TLS_CERT=cert.pem TLS_KEY=key.pem node server.js",
+    "check": "node --check server.js && node --check worker.js",
+    "cert": "openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'",
+    "deploy": "wrangler deploy"
+  }
+}

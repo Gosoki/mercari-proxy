@@ -1,3 +1,21 @@
-/README.md
-/worker.js
-/wrangler.toml
+# dependencies
+node_modules/
+
+# TLS certs (generate your own with openssl)
+*.pem
+*.key
+*.crt
+
+# Cloudflare Wrangler
+.wrangler/
+.dev.vars
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -31,7 +31,7 @@ const DROP_RESP_HEADERS = new Set([
   "content-encoding", "content-length", "transfer-encoding", "connection",
 ]);
 
-const server = http.createServer(async (req, res) => {
+const handler = async (req, res) => {
   try {
     const PROXY_HOST = req.headers.host || `localhost:${PORT}`;
     const reqUrl = new URL(req.url, `http://${PROXY_HOST}`);
@@ -116,7 +116,24 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
     res.end("proxy error: " + (e && e.message ? e.message : String(e)));
   }
-});
+};
+
+// http 还是 https：设了 TLS_CERT/TLS_KEY 就走 https（局域网 IP / 域名访问必须走 https，
+// 否则浏览器不是安全上下文，crypto.subtle 不可用 → Mercari 的 DPoP 签不出 → 商品刷不出）。
+const TLS_CERT = process.env.TLS_CERT;
+const TLS_KEY = process.env.TLS_KEY;
+const SCHEME = TLS_CERT && TLS_KEY ? "https" : "http";
+let server;
+if (SCHEME === "https") {
+  const https = require("https");
+  const fs = require("fs");
+  server = https.createServer(
+    { cert: fs.readFileSync(TLS_CERT), key: fs.readFileSync(TLS_KEY) },
+    handler
+  );
+} else {
+  server = http.createServer(handler);
+}
 
 // ---------------- WebSocket 代理：/__pws__/<host>/<path> ----------------
 server.on("upgrade", (req, clientSock, head) => {
@@ -154,7 +171,9 @@ function toProxyUrl(absUrl, proxyHost) {
     const u = new URL(absUrl);
     if (u.hostname === proxyHost) return absUrl;
     if (!UPSTREAM_RE.test(u.hostname)) return absUrl;
-    return `http://${proxyHost}/__p/${u.hostname}${u.pathname}${u.search}`;
+    // 用协议相对 //host/...，让浏览器按当前页面协议解析（https 页面→https，http→http），
+    // 避免在 https 页面里改出 http 链接造成 mixed-content 被拦。
+    return `//${proxyHost}/__p/${u.hostname}${u.pathname}${u.search}`;
   } catch {
     return absUrl;
   }
@@ -303,6 +322,12 @@ function readBody(req) {
 }
 
 server.listen(PORT, () => {
-  console.log(`mercari-proxy (node) → http://localhost:${PORT}`);
+  console.log(`mercari-proxy (node) → ${SCHEME}://localhost:${PORT}`);
   console.log(`默认上游: ${DEFAULT_UPSTREAM}`);
+  if (SCHEME === "http") {
+    console.log(
+      "⚠ 当前是 http。只有 http://localhost 能用；用局域网 IP/域名访问会因不是安全上下文而 crypto.subtle 缺失，DPoP 失败、商品刷不出。"
+    );
+    console.log("  上 https：openssl 生成自签证书后用 TLS_CERT=cert.pem TLS_KEY=key.pem node server.js");
+  }
 });
