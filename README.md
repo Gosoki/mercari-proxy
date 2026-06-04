@@ -2,12 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](#)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020.svg)](#)
+[![Zero deps](https://img.shields.io/badge/deps-0-blue.svg)](#)
 
-A zero-dependency reverse proxy for **Mercari** (jp / us), shipped in two flavors:
-
-- **`server.js`** — single-file Node server (Node 18+).
-- **`worker.js`** — single-file Cloudflare Worker.
+A **zero-dependency**, single-file Node reverse proxy for **Mercari** (jp / us).
 
 > [中文文档见下方](#中文文档)
 
@@ -28,48 +25,48 @@ The net effect: cookies, auth, DPoP — all keep working.
 
 ## Quick start
 
-### Option A — Node (recommended for personal use)
-
 ```bash
 git clone https://github.com/gosoki/mercari-proxy.git
 cd mercari-proxy
 npm start                 # http://localhost:8787
 ```
 
-Other variants:
+That's it — zero install step, zero runtime dependencies. Node 18+ is the only requirement.
+
+### Other useful scripts
 
 ```bash
-PORT=9000 npm start                 # custom port
-npm run start:us                    # proxy the US site (www.mercari.com)
-npm run cert && npm run start:https # generate self-signed cert + run HTTPS
+PORT=9000 npm start                  # custom port
+npm run start:us                     # proxy the US site (www.mercari.com)
+npm run cert && npm run start:https  # generate self-signed cert + run HTTPS
+npm run check                        # syntax check
 ```
 
-Outbound requests go from **your own IP**, which is the least likely to trip Mercari's bot/WAF rules.
+Outbound requests go from **your own IP**, which is the least likely to trip Mercari's bot / WAF rules.
 
-> **Why HTTPS matters for LAN access.** If you open the proxy via `http://<lan-ip>:8787`, the browser does *not* consider it a secure context, so `crypto.subtle` is missing and DPoP signing fails — items won't load. `http://localhost` is fine, anything else needs HTTPS.
+### When you need HTTPS
 
-### Option B — Cloudflare Workers
+If you open the proxy via `http://<lan-ip>:8787`, the browser does *not* consider it a secure context, so `crypto.subtle` is missing and DPoP signing fails — items won't load. `http://localhost` is fine; anything else needs HTTPS:
 
 ```bash
-npm i -g wrangler
-wrangler login
-# edit wrangler.toml: set your route pattern + zone_name
-npm run deploy
+npm run cert            # writes cert.pem + key.pem (self-signed, 365 days)
+npm run start:https     # serves on https://localhost:8787
 ```
 
-> ⚠️ **Known gotcha (already handled in `worker.js`).** `api.mercari.jp` itself sits behind Cloudflare. If you forward the incoming request's headers as-is, Cloudflare injects `cf-connecting-ip` etc. — and the upstream CF rejects requests carrying a `cf-connecting-ip` it didn't set, returning a **WAF 403** that looks like "search / items broken". `worker.js` strips all `cf-*`, `x-forwarded-*`, and `x-real-ip` before forwarding.
+Self-signed certs need a one-time "trust" / "advanced → proceed" in the browser.
 
 ---
 
 ## Configuration
 
-| Where | What to change |
-| ----- | -------------- |
-| `worker.js` | `DEFAULT_UPSTREAM` — `jp.mercari.com` (default) or `www.mercari.com` |
-| `wrangler.toml` | `routes[].pattern` and `zone_name` to your domain |
-| Env (`server.js`) | `PORT`, `UPSTREAM`, `TLS_CERT`, `TLS_KEY` |
+| Where | What | Default |
+| ----- | ---- | ------- |
+| Env `PORT` | Listening port | `8787` |
+| Env `UPSTREAM` | Upstream host | `jp.mercari.com` |
+| Env `TLS_CERT`, `TLS_KEY` | Enable HTTPS when both are set | unset (HTTP) |
+| `server.js` → `JS_PATCHES` | Targeted string-replacement in bundled JS | `[]` |
 
-Both files also accept a `JS_PATCHES` array for targeted string-replacement in the bundled JS — e.g. defusing a hardcoded `location.host === "jp.mercari.com"` check. Empty by default; leave it empty unless something is actually blocking you.
+Leave `JS_PATCHES` empty unless something specific is blocking you (e.g. a hardcoded `location.host === "jp.mercari.com"` check that needs neutralizing).
 
 ---
 
@@ -87,11 +84,10 @@ Both files also accept a `JS_PATCHES` array for targeted string-replacement in t
 
 ```
 mercari-proxy/
-├── server.js       # Node server (single file, zero deps)
-├── worker.js       # Cloudflare Worker (single file)
-├── wrangler.toml   # CF Worker deployment config
+├── server.js       # the whole proxy, zero deps
 ├── package.json    # npm scripts only — no runtime deps
-└── LICENSE         # MIT
+├── LICENSE         # MIT
+└── README.md
 ```
 
 ---
@@ -104,7 +100,7 @@ Reverse-proxying someone else's site touches copyright and Terms of Service. Thi
 
 ## 中文文档
 
-Cloudflare Workers / Node 反代煤炉 (Mercari)，零依赖单文件。
+零依赖单文件 Node 反代煤炉 (Mercari)。
 
 ### 原理
 
@@ -112,38 +108,44 @@ Cloudflare Workers / Node 反代煤炉 (Mercari)，零依赖单文件。
 - **客户端（注入脚本）**：运行时劫持 `fetch` / `XHR` / `WebSocket` 和 `src` / `href` 的 setter，把煤炉域名改写成走代理
 - **关键**：不静态改 JS 里的 API 域名，让 Mercari 原版代码先把 DPoP 签名算好（`htu` 仍是 `api.mercari.jp`），只在发请求那一刻换 host，转发时把 Host 设回源站 → 服务端校验 `htu` 仍匹配，登录态/接口能用
 
-### 部署
-
-**方式一：本机 / 普通服务器跑 Node（推荐）**
+### 开跑
 
 ```bash
 git clone https://github.com/gosoki/mercari-proxy.git
 cd mercari-proxy
 npm start                            # http://localhost:8787
+```
+
+零安装，零运行时依赖，Node 18+ 即可。出站走你本机 IP，最不容易踩风控。
+
+其它常用命令：
+
+```bash
 PORT=9000 npm start                  # 换端口
 npm run start:us                     # 换成美区 www.mercari.com
 npm run cert && npm run start:https  # 自签证书 + 跑 HTTPS
+npm run check                        # 语法检查
 ```
 
-零依赖，Node 18+ 即可。出站走你本机 IP，最不容易踩风控。
+### 关于 HTTPS
 
-> **关于 HTTPS**：局域网 IP / 域名访问必须走 HTTPS，否则浏览器不是安全上下文，`crypto.subtle` 不可用 → Mercari 的 DPoP 签不出 → 商品刷不出。`http://localhost` 例外，能直接用。
-
-**方式二：Cloudflare Workers**
+局域网 IP / 域名访问必须走 HTTPS，否则浏览器不是安全上下文，`crypto.subtle` 不可用 → Mercari 的 DPoP 签不出 → 商品刷不出。`http://localhost` 例外，能直接用。
 
 ```bash
-npm i -g wrangler
-wrangler login
-# 改 wrangler.toml 里的 pattern / zone_name
-npm run deploy
+npm run cert            # 生成自签证书 cert.pem + key.pem
+npm run start:https     # https://localhost:8787
 ```
 
-> ⚠️ **坑（已在 worker.js 修掉）**：`api.mercari.jp` 也在 Cloudflare 后面。Worker 入站请求里 Cloudflare 会注入 `cf-connecting-ip` 等头，若用 `new Headers(request.headers)` 原样转发，上游那侧的 CF 会把它当成「伪造 cf-connecting-ip」直接 **WAF 403**，表现为搜索/商品接口全挂、商品显示不出来。`worker.js` 现在转发前会 strip 掉所有 `cf-*` / `x-forwarded-*` / `x-real-ip`。
+自签证书第一次访问需要在浏览器点「高级 → 继续访问」。
 
-### 用之前要改的
+### 配置项
 
-1. `worker.js` 里的 `DEFAULT_UPSTREAM`（日本站 `jp.mercari.com`，美区 `www.mercari.com`）
-2. `wrangler.toml` 里的 `pattern` / `zone_name`
+| 在哪 | 是啥 | 默认值 |
+| ---- | ---- | ------ |
+| 环境变量 `PORT` | 监听端口 | `8787` |
+| 环境变量 `UPSTREAM` | 上游域名 | `jp.mercari.com` |
+| 环境变量 `TLS_CERT` / `TLS_KEY` | 同时设置则跑 HTTPS | 未设置（跑 HTTP） |
+| `server.js` 里 `JS_PATCHES` | JS 文本针对性替换 | `[]` |
 
 ### 注意点
 

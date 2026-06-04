@@ -1,12 +1,11 @@
 {
   "name": "mercari-proxy",
   "version": "0.1.0",
-  "description": "A zero-dependency reverse proxy for Mercari (jp/us). Runs on Node 18+ or Cloudflare Workers.",
+  "description": "A zero-dependency Node reverse proxy for Mercari (jp / us).",
   "keywords": [
     "mercari",
     "proxy",
     "reverse-proxy",
-    "cloudflare-workers",
     "node"
   ],
   "license": "MIT",
@@ -23,8 +22,7 @@
     "start": "node server.js",
     "start:us": "UPSTREAM=www.mercari.com node server.js",
     "start:https": "TLS_CERT=cert.pem TLS_KEY=key.pem node server.js",
-    "check": "node --check server.js && node --check worker.js",
-    "cert": "openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'",
-    "deploy": "wrangler deploy"
+    "check": "node --check server.js",
+    "cert": "openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'"
   }
 }
