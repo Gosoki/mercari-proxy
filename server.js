@@ -1,9 +1,6 @@
 // ============================================================
 // Node 反代煤炉 (Mercari) —— 零依赖单文件 (Node 18+，建议 20/24)
 //   node server.js           # 默认 http://localhost:8787
-//   PORT=9000 node server.js
-// 关键：跑在你本机/普通服务器上，出站请求带的是住宅/普通 IP，
-// 不会触发 "Cloudflare Worker -> Cloudflare 源站" 的 WAF 403。
 // ============================================================
 const http = require("http");
 const tls = require("tls");
