@@ -6,7 +6,9 @@ node_modules/
 *.key
 *.crt
 
-# Cloudflare Wrangler
+# Cloudflare Worker variant (not part of this repo)
+worker.js
+wrangler.toml
 .wrangler/
 .dev.vars
 
